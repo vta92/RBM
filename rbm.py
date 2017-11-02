@@ -51,20 +51,42 @@ def matrix_rep(data, total_users, total_movies):
 train_set1 = matrix_rep(train_set1, total_users, total_movies)
 test_set1 = matrix_rep(test_set1, total_users, total_movies)
 
+
 train_set1 = torch.FloatTensor(train_set1) #tensor input is list of list
 test_set1 = torch.FloatTensor(test_set1)
+
+#ratings need to be binary in result.
+#torch tensor can't do >= or <= filtering
+
+def filtering(tensor):
+    
+    for row in range(len(tensor)):
+        for col in range(len(tensor[row])):
+            
+            if tensor[row][col] == 0:
+                tensor[row][col] = -1
+            elif tensor[row][col] <= 2:
+                tensor[row][col] = 0
+            else:
+                tensor[row][col] = 1
+    return tensor
 
 #ratings need to be binary in result.
 train_set1[train_set1 == 0] = -1
 test_set1[test_set1 == 0] = -1
 
-train_set1[train_set1 > 2] = 1
-test_set1[test_set1 > 2] = 1
-
 train_set1[train_set1 == 1] = 0
 train_set1[train_set1 == 2] = 0
 test_set1[test_set1 == 1] = 0
 test_set1[test_set1 == 2] = 0
+
+train_set1[train_set1 > 2] = 1
+test_set1[test_set1 > 2] = 1
+
+
+train_set1 = filtering(train_set1)
+test_set1 = filtering(test_set1)
+
 
 #implementation of RBM
 class RBM(object):
@@ -94,46 +116,32 @@ class RBM(object):
     def training(self, vis0,vis_k,prob_h_vis0, prob_h_vis_k):#visible node, vis after k sampling
         self.weight +=torch.mm(vis0.t(),prob_h_vis0) - torch.mm(vis_k.t(), prob_h_vis_k) #transposing vis's, and differences in prob between sampling
         self.bias_vis += torch.sum((vis0-vis_k),0) #the 0 to keep the format as a 2d tensor        
-        self.bias_hid += torch.sum((prob_h_vis0-prob_h_vis_k),0)
-        
+        self.bias_hid += torch.sum((prob_h_vis0 - prob_h_vis_k),0)
 
 
-num_vis = len(train_set1[0])
-num_hid = 200 # start off with a random number of hidden nodes
-batch_size,epochs = 200,20
-k_steps = 20
+nv = len(train_set1[0])
+nh = 100
+batch_size = 100
+rbm = RBM(nv, nh)
 
-model = RBM(num_vis, num_hid)
-
-
-
-
-
-for i in range(epochs):
-    counter = 0
-    loss = 0
-    
-    #implementation of batch learning
-    for user in range(0,total_users-batch_size,batch_size): #stepping of 200 each
-        vis_k = train_set1[user:user+batch_size] #batch input
-        vis0  = train_set1[user:user+batch_size]#at the initial sampling, output = same
-        prob_h_vis0, _ = model.sample_hid(vis0)
-        
-        for k in range(k_steps): #k-steps of CD
-            _, hid_k = model.sample_hid(vis_k) #we want vis0, but we don't want to alter targets
-            _, vis_k = model.sample_vis(hid_k)
-            vis_k[vis0 < 0] = vis0[vis0 < 0] #keeping the unrated movies from changing while sampling.
-        
-        prob_h_vis_k,_ = model.sample_hid(vis_k)
-        model.training(vis0, vis_k, prob_h_vis0, prob_h_vis_k)
-        #update the loss. Absolute mean difference loss function, with unrated movies untouched.
-        loss += torch.mean(torch.abs(vis0[vis0>=0] - vis_k[vis0>=0]))
-        counter += 1
-    print("epochs:" + str(i), "loss" + str(loss/counter))
-        
-    
-    
-
+# Training the RBM
+nb_epoch = 10
+for epoch in range(1, nb_epoch + 1):
+    train_loss = 0
+    s = 0.
+    for id_user in range(0, total_users - batch_size, batch_size):
+        vk = train_set1[id_user:id_user+batch_size]
+        v0 = train_set1[id_user:id_user+batch_size]
+        ph0,_ = rbm.sample_hid(v0)
+        for k in range(10):
+            _,hk = rbm.sample_hid(vk)
+            _,vk = rbm.sample_vis(hk)
+            vk[v0<0] = v0[v0<0]
+        phk,_ = rbm.sample_hid(vk)
+        rbm.training(v0, vk, ph0, phk)
+        train_loss += torch.mean(torch.abs(v0[v0>=0] - vk[v0>=0]))
+        s += 1.
+    print('epoch: '+str(epoch)+' loss: '+str(train_loss/s))
 
 
 
