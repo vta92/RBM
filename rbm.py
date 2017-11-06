@@ -39,12 +39,12 @@ total_movies = max(train_set1[:,1].max(), test_set1[:,1].max())
 #we have a 943x1682 matrix from the 2 variables above, with each cell contains a rating
 #pytorch expects a list of list
 def matrix_rep(data, total_users, total_movies):
-    matrix=[[0.0 for i in range(total_movies)] for i in range(total_users)]
+    matrix=[[0 for i in range(total_movies)] for i in range(total_users)]
     
-    for row in range(total_users):
-        for col in range(total_movies):
-            user_id, movie_id, rating = data[row][0], data[row][1], data[row][2]
-            matrix[user_id-1][movie_id-1] = float(rating)
+    for row in range(len(data)): #get the number of rows in the whole test set
+        user_id, movie_id, rating = data[row][0], data[row][1], data[row][2]
+        matrix[user_id-1][movie_id-1] = float(rating)
+            
     return matrix
 
 #unit test for matrix population
@@ -120,12 +120,12 @@ class RBM(object):
 
 
 nv = len(train_set1[0])
-nh = 100
-batch_size = 100
+nh = 200
+batch_size = 200
 rbm = RBM(nv, nh)
 
 # Training the RBM
-nb_epoch = 10
+nb_epoch = 20
 for epoch in range(1, nb_epoch + 1):
     train_loss = 0
     s = 0.
